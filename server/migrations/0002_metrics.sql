@@ -1,0 +1,2 @@
+ALTER TABLE kiosks ADD COLUMN metrics TEXT;
+ALTER TABLE kiosks ADD COLUMN metrics_at INTEGER;
