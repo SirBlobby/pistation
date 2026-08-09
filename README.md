@@ -146,9 +146,13 @@ stage, so an overloaded kiosk loses frames instead of falling further behind.
 Published to GitHub Container Registry on every push to `main` and every `v*` tag:
 
 ```
-ghcr.io/sirblobby/pistation-server
-ghcr.io/sirblobby/pistation-web
+docker pull ghcr.io/sirblobby/pistation-server:latest
+docker pull ghcr.io/sirblobby/pistation-web:latest
 ```
+
+The Compose stack builds from source by default. To run the published images instead, replace the
+`build:` block on the `server` and `web` services in `infra/docker-compose.yml` with an `image:`
+line pointing at the tag above.
 
 ## Licence
 
