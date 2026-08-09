@@ -81,7 +81,10 @@ pub struct KioskIdentity {
 impl FromRequestParts<AppState> for AdminIdentity {
     type Rejection = AppError;
 
-    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
         let token = bearer_token(parts)?;
         let data = decode::<AdminClaims>(
             &token,
@@ -100,7 +103,10 @@ impl FromRequestParts<AppState> for AdminIdentity {
 impl FromRequestParts<AppState> for KioskIdentity {
     type Rejection = AppError;
 
-    async fn from_request_parts(parts: &mut Parts, state: &AppState) -> Result<Self, Self::Rejection> {
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
         let token = bearer_token(parts)?;
         let token_hash = hash_opaque_token(&token);
 

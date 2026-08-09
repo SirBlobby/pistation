@@ -30,7 +30,11 @@ fn resolve_server_url(state: &AppState, headers: &HeaderMap) -> String {
     }
 
     if !state.config.public_api_url.is_empty() {
-        return state.config.public_api_url.trim_end_matches('/').to_string();
+        return state
+            .config
+            .public_api_url
+            .trim_end_matches('/')
+            .to_string();
     }
 
     "http://localhost:8080".to_string()

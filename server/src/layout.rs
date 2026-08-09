@@ -118,7 +118,9 @@ fn apply_defaults(kiosk_id: &str, mut layout: Value) -> Value {
         .entry("foregroundColor")
         .or_insert_with(|| json!("#f4f6f8"));
     object.entry("widgetOpacity").or_insert_with(|| json!(0.5));
-    object.entry("background").or_insert_with(default_background);
+    object
+        .entry("background")
+        .or_insert_with(default_background);
     object.entry("nightMode").or_insert_with(default_night_mode);
     object.entry("widgets").or_insert_with(|| json!([]));
     object
@@ -160,10 +162,11 @@ fn fill_nested_defaults(target: Option<&mut Value>, defaults: Value) {
 }
 
 pub async fn load_layout(db: &SqlitePool, kiosk_id: &str) -> AppResult<Value> {
-    let row: Option<(String,)> = sqlx::query_as("SELECT data FROM kiosk_layouts WHERE kiosk_id = ?")
-        .bind(kiosk_id)
-        .fetch_optional(db)
-        .await?;
+    let row: Option<(String,)> =
+        sqlx::query_as("SELECT data FROM kiosk_layouts WHERE kiosk_id = ?")
+            .bind(kiosk_id)
+            .fetch_optional(db)
+            .await?;
 
     let stored = match row {
         Some((data,)) => serde_json::from_str(&data).unwrap_or_else(|_| default_layout(kiosk_id)),

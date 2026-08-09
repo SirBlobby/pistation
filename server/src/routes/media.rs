@@ -34,22 +34,29 @@ pub async fn store_image(
     }
 
     if body.len() > MAX_UPLOAD_BYTES {
-        return Err(AppError::BadRequest("images must be 8 MB or smaller".into()));
+        return Err(AppError::BadRequest(
+            "images must be 8 MB or smaller".into(),
+        ));
     }
 
     let content_type = headers
         .get(axum::http::header::CONTENT_TYPE)
         .and_then(|value| value.to_str().ok())
-        .map(|value| value.split(';').next().unwrap_or(value).trim().to_lowercase())
+        .map(|value| {
+            value
+                .split(';')
+                .next()
+                .unwrap_or(value)
+                .trim()
+                .to_lowercase()
+        })
         .unwrap_or_default();
 
     let extension = ALLOWED_TYPES
         .iter()
         .find(|(mime, _)| *mime == content_type)
         .map(|(_, extension)| *extension)
-        .ok_or_else(|| {
-            AppError::BadRequest("images must be a PNG, JPEG, WEBP or GIF".into())
-        })?;
+        .ok_or_else(|| AppError::BadRequest("images must be a PNG, JPEG, WEBP or GIF".into()))?;
 
     let directory = std::path::Path::new(&state.config.media_dir);
     tokio::fs::create_dir_all(directory)

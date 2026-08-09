@@ -5,7 +5,6 @@ use axum::{Json, Router};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-
 use crate::auth::{generate_opaque_token, hash_opaque_token, KioskIdentity};
 use crate::clock::now_ms;
 use crate::error::{AppError, AppResult};

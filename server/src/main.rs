@@ -75,7 +75,10 @@ async fn main() {
         .nest("/api/kiosk", routes::kiosk_router().layer(kiosk_cors))
         .nest("/api", routes::api_router().layer(cors))
         .nest_service("/media", ServeDir::new(state.config.media_dir.clone()))
-        .nest_service("/downloads", ServeDir::new(state.config.package_dir.clone()))
+        .nest_service(
+            "/downloads",
+            ServeDir::new(state.config.package_dir.clone()),
+        )
         .layer(TraceLayer::new_for_http())
         .with_state(state);
 

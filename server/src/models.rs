@@ -39,9 +39,7 @@ impl From<KioskRow> for KioskView {
             status: row.status,
             last_seen_at: row.last_seen_at,
             created_at: row.created_at,
-            metrics: row
-                .metrics
-                .and_then(|raw| serde_json::from_str(&raw).ok()),
+            metrics: row.metrics.and_then(|raw| serde_json::from_str(&raw).ok()),
             metrics_at: row.metrics_at,
         }
     }

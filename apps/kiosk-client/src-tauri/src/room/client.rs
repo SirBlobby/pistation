@@ -95,11 +95,11 @@ impl RoomHandle {
 
 fn handle_event(app: &AppHandle, generation: u64, event: RoomEvent) {
     match event {
-        RoomEvent::Connected { .. } => emit_status(app, generation, StatusPayload::new("connected")),
-
-        RoomEvent::Reconnecting => {
-            emit_status(app, generation, StatusPayload::new("reconnecting"))
+        RoomEvent::Connected { .. } => {
+            emit_status(app, generation, StatusPayload::new("connected"))
         }
+
+        RoomEvent::Reconnecting => emit_status(app, generation, StatusPayload::new("reconnecting")),
 
         RoomEvent::Reconnected => emit_status(app, generation, StatusPayload::new("connected")),
 

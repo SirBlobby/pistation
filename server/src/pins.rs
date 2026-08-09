@@ -24,13 +24,15 @@ pub async fn issue_pin(
     let expires_at = issued_at + seconds_to_ms(rotation_seconds + grace_seconds);
     let pin = allocate_unique_pin(db, issued_at).await?;
 
-    sqlx::query("INSERT INTO kiosk_pins (pin, kiosk_id, issued_at, expires_at) VALUES (?, ?, ?, ?)")
-        .bind(&pin)
-        .bind(kiosk_id)
-        .bind(issued_at)
-        .bind(expires_at)
-        .execute(db)
-        .await?;
+    sqlx::query(
+        "INSERT INTO kiosk_pins (pin, kiosk_id, issued_at, expires_at) VALUES (?, ?, ?, ?)",
+    )
+    .bind(&pin)
+    .bind(kiosk_id)
+    .bind(issued_at)
+    .bind(expires_at)
+    .execute(db)
+    .await?;
 
     Ok(IssuedPin {
         pin,

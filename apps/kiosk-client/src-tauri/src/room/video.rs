@@ -29,13 +29,7 @@ pub const PRIORITY_SCREEN: u8 = 2;
 ///
 /// Frames are converted to BGRA, which on a little endian machine is the same layout as
 /// cairo's ARgb32, and handed to the native drawing surface sitting under the webview.
-pub fn start(
-    app: AppHandle,
-    generation: u64,
-    track: RemoteVideoTrack,
-    priority: u8,
-    sid: String,
-) {
+pub fn start(app: AppHandle, generation: u64, track: RemoteVideoTrack, priority: u8, sid: String) {
     // A camera must not displace a screen share that is already on the display.
     if IS_STREAMING.load(Ordering::SeqCst) && CURRENT_PRIORITY.load(Ordering::SeqCst) > priority {
         return;

@@ -85,10 +85,11 @@ async fn list_kiosks(
     State(state): State<AppState>,
     _admin: AdminIdentity,
 ) -> AppResult<Json<KioskListResponse>> {
-    let rows: Vec<KioskRow> =
-        sqlx::query_as(&format!("SELECT {KIOSK_COLUMNS} FROM kiosks ORDER BY created_at"))
-            .fetch_all(&state.db)
-            .await?;
+    let rows: Vec<KioskRow> = sqlx::query_as(&format!(
+        "SELECT {KIOSK_COLUMNS} FROM kiosks ORDER BY created_at"
+    ))
+    .fetch_all(&state.db)
+    .await?;
 
     let now = now_ms();
     let kiosks = rows
