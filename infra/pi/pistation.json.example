@@ -1,0 +1,5 @@
+{
+  "serverUrl": "http://pistation.local:8080",
+  "enrollmentToken": "paste-the-token-from-the-admin-panel",
+  "joinUrl": "pistation.local:3000"
+}

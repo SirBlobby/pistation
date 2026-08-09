@@ -1,0 +1,58 @@
+name: pistation
+
+services:
+  livekit:
+    image: livekit/livekit-server:latest
+    restart: unless-stopped
+    command: --config /etc/livekit.yaml
+    environment:
+      LIVEKIT_KEYS: "${LIVEKIT_API_KEY}: ${LIVEKIT_API_SECRET}"
+    volumes:
+      - ./livekit.yaml:/etc/livekit.yaml:ro
+    network_mode: host
+
+  server:
+    build:
+      context: ..
+      dockerfile: server/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - livekit
+    environment:
+      BIND_ADDRESS: 0.0.0.0:8080
+      DATABASE_URL: sqlite:///data/pistation.db?mode=rwc
+      MEDIA_DIR: /data/media
+      PACKAGE_DIR: /data/packages
+      PUBLIC_API_URL: ${PUBLIC_API_URL}
+      LIVEKIT_URL: ${PUBLIC_LIVEKIT_URL}
+      LIVEKIT_API_KEY: ${LIVEKIT_API_KEY}
+      LIVEKIT_API_SECRET: ${LIVEKIT_API_SECRET}
+      SESSION_SECRET: ${SESSION_SECRET}
+      SESSION_TTL_HOURS: ${SESSION_TTL_HOURS}
+      BOOTSTRAP_ADMIN_EMAIL: ${BOOTSTRAP_ADMIN_EMAIL}
+      BOOTSTRAP_ADMIN_PASSWORD: ${BOOTSTRAP_ADMIN_PASSWORD}
+      PIN_ROTATION_SECONDS: ${PIN_ROTATION_SECONDS}
+      PIN_GRACE_SECONDS: ${PIN_GRACE_SECONDS}
+      CORS_ORIGINS: ${CORS_ORIGINS}
+    volumes:
+      - server-data:/data
+    ports:
+      - "8080:8080"
+
+  web:
+    build:
+      context: ..
+      dockerfile: apps/web-client/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      - server
+    environment:
+      PORT: 3000
+      HOST: 0.0.0.0
+      PUBLIC_API_URL: ${PUBLIC_API_URL}
+      PUBLIC_LIVEKIT_URL: ${PUBLIC_LIVEKIT_URL}
+    ports:
+      - "3000:3000"
+
+volumes:
+  server-data:
