@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  server:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            server/target
+          key: cargo-server-${{ hashFiles('server/Cargo.toml') }}
+          restore-keys: cargo-server-
+
+      - name: Check formatting
+        working-directory: server
+        run: cargo fmt --check
+
+      - name: Clippy
+        working-directory: server
+        run: cargo clippy --all-targets
+
+      - name: Build
+        working-directory: server
+        run: cargo build --release
+
+      - name: Test
+        working-directory: server
+        run: cargo test
+
+  frontend:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ hashFiles('**/package.json') }}
+          restore-keys: bun-
+
+      - name: Install
+        run: bun install
+
+      - name: Type check
+        run: bun run check
+
+      - name: Build web client
+        run: bun run build:web
+
+  kiosk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - name: Install Tauri system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev \
+            libgtk-3-dev \
+            librsvg2-dev \
+            libayatana-appindicator3-dev \
+            libssl-dev \
+            patchelf \
+            build-essential \
+            file \
+            wget
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            apps/kiosk-client/src-tauri/target
+          key: cargo-kiosk-${{ hashFiles('apps/kiosk-client/src-tauri/Cargo.toml') }}
+          restore-keys: cargo-kiosk-
+
+      - name: Install
+        run: bun install
+
+      - name: Check formatting
+        working-directory: apps/kiosk-client/src-tauri
+        run: cargo fmt --check
+
+      - name: Clippy
+        working-directory: apps/kiosk-client/src-tauri
+        run: cargo clippy --all-targets
+
+      - name: Build kiosk bundle
+        run: bun run build:kiosk
