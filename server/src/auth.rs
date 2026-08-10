@@ -78,6 +78,11 @@ pub struct KioskIdentity {
     pub room_name: String,
 }
 
+pub struct SessionIdentity {
+    pub session_id: String,
+    pub kiosk_id: String,
+}
+
 impl FromRequestParts<AppState> for AdminIdentity {
     type Rejection = AppError;
 
@@ -122,6 +127,36 @@ impl FromRequestParts<AppState> for KioskIdentity {
         Ok(KioskIdentity {
             kiosk_id,
             room_name,
+        })
+    }
+}
+
+impl FromRequestParts<AppState> for SessionIdentity {
+    type Rejection = AppError;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &AppState,
+    ) -> Result<Self, Self::Rejection> {
+        let session_id = bearer_token(parts)?;
+
+        let row: Option<(String, i64)> = sqlx::query_as(
+            "SELECT kiosk_id, expires_at FROM sessions WHERE id = ? AND revoked = 0",
+        )
+        .bind(&session_id)
+        .fetch_optional(&state.db)
+        .await?;
+
+        let (kiosk_id, expires_at) =
+            row.ok_or_else(|| AppError::Unauthorized("unknown session".into()))?;
+
+        if expires_at <= crate::clock::now_ms() {
+            return Err(AppError::Unauthorized("session expired".into()));
+        }
+
+        Ok(SessionIdentity {
+            session_id,
+            kiosk_id,
         })
     }
 }

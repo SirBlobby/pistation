@@ -4,6 +4,7 @@ pub mod join;
 pub mod kiosk;
 pub mod media;
 pub mod organization;
+pub mod whiteboard;
 
 pub use install::install_script;
 
@@ -19,6 +20,7 @@ pub fn api_router() -> Router<AppState> {
         .route("/health", get(health))
         .merge(join::router())
         .merge(organization::public_router())
+        .merge(whiteboard::router())
         .nest(
             "/admin",
             admin::router()

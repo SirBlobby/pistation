@@ -16,6 +16,7 @@ export interface RoomState {
   roomName: string;
   mode: RoomMode;
   presenterId: string | null;
+  whiteboardOwnerId?: string | null;
   annotationsLocked: boolean;
   updatedAt: number;
 }

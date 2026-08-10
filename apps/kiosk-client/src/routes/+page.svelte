@@ -61,7 +61,11 @@
         </p>
       </div>
     {:else if kiosk.mode === "whiteboard"}
-      <WhiteboardCanvas elements={kiosk.whiteboardElements} readOnly={true} />
+      <WhiteboardCanvas
+        elements={kiosk.whiteboardElements}
+        files={kiosk.resolvedWhiteboardFiles}
+        readOnly={true}
+      />
     {:else if isPresenting}
       <AnnotationOverlay annotations={kiosk.annotations} labels={participantLabels} />
     {:else if kiosk.layout && kiosk.isNight}

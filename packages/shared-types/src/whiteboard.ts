@@ -6,14 +6,22 @@ export interface WhiteboardElement {
   [key: string]: unknown;
 }
 
+export interface WhiteboardFile {
+  id: string;
+  url: string;
+  mimeType: string;
+}
+
 export interface WhiteboardPatchEvent {
   type: "whiteboard.patch";
   elements: WhiteboardElement[];
+  files?: WhiteboardFile[];
 }
 
 export interface WhiteboardSnapshotEvent {
   type: "whiteboard.snapshot";
   elements: WhiteboardElement[];
+  files?: WhiteboardFile[];
   backgroundColor: string;
 }
 
@@ -43,6 +51,22 @@ export function mergeWhiteboardElements(
     const existing = byId.get(element.id);
     if (!existing || isNewerElement(element, existing)) {
       byId.set(element.id, element);
+    }
+  }
+  return [...byId.values()];
+}
+
+export function mergeWhiteboardFiles(
+  current: WhiteboardFile[],
+  incoming: WhiteboardFile[]
+): WhiteboardFile[] {
+  const byId = new Map<string, WhiteboardFile>();
+  for (const file of current) {
+    byId.set(file.id, file);
+  }
+  for (const file of incoming) {
+    if (!byId.has(file.id)) {
+      byId.set(file.id, file);
     }
   }
   return [...byId.values()];

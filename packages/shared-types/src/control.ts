@@ -3,6 +3,7 @@ import type { RoomMode, RoomState } from "./room.js";
 export interface ModeSetEvent {
   type: "mode.set";
   mode: RoomMode;
+  ownerId?: string | null;
 }
 
 export interface PresenterSetEvent {

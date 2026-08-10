@@ -2,12 +2,14 @@ import type {
   DataEnvelope,
   KioskLayout,
   RoomMode,
-  WhiteboardElement
+  WhiteboardElement,
+  WhiteboardFile
 } from "@pistation/shared-types";
 import {
   isNightModeActive,
   isTopic,
   mergeWhiteboardElements,
+  mergeWhiteboardFiles,
   PIN_GRACE_SECONDS
 } from "@pistation/shared-types";
 import type { ConnectionStatus } from "@pistation/client-core";
@@ -52,6 +54,7 @@ export class KioskController {
   mode = $state<RoomMode>("idle");
   annotations = $state<AnnotationState>(createAnnotationState());
   whiteboardElements = $state<WhiteboardElement[]>([]);
+  whiteboardFiles = $state<WhiteboardFile[]>([]);
   participants = $state<RoomParticipant[]>([]);
   isScreenActive = $state(false);
   screenWidth = $state(0);
@@ -60,6 +63,13 @@ export class KioskController {
   mediaBaseUrl = $state("");
   isNight = $state(false);
   connectionError = $state<string | null>(null);
+
+  get resolvedWhiteboardFiles(): WhiteboardFile[] {
+    return this.whiteboardFiles.map((file) => ({
+      ...file,
+      url: file.url.startsWith("http") ? file.url : `${this.mediaBaseUrl}${file.url}`
+    }));
+  }
 
   private config: KioskConfig | null = null;
   private connection: NativeRoom | null = null;
@@ -281,12 +291,15 @@ export class KioskController {
       const event = envelope.payload;
       if (event.type === "whiteboard.patch") {
         this.whiteboardElements = mergeWhiteboardElements(this.whiteboardElements, event.elements);
+        this.whiteboardFiles = mergeWhiteboardFiles(this.whiteboardFiles, event.files ?? []);
       }
       if (event.type === "whiteboard.snapshot") {
         this.whiteboardElements = event.elements;
+        this.whiteboardFiles = mergeWhiteboardFiles(this.whiteboardFiles, event.files ?? []);
       }
       if (event.type === "whiteboard.clear") {
         this.whiteboardElements = [];
+        this.whiteboardFiles = [];
       }
     }
   }

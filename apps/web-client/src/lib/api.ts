@@ -73,6 +73,32 @@ export function refreshSession(sessionId: string): Promise<SessionRefreshRespons
   });
 }
 
+export async function uploadWhiteboardImage(
+  sessionId: string,
+  blob: Blob
+): Promise<{ imageUrl: string }> {
+  let response: Response;
+
+  try {
+    response = await fetch(`${apiBaseUrl}/api/whiteboard/image`, {
+      method: "PUT",
+      headers: { "content-type": blob.type, authorization: `Bearer ${sessionId}` },
+      body: blob
+    });
+  } catch {
+    throw new ApiError(0, "network", "Could not reach the PiStation server.");
+  }
+
+  const payload = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    const message = (payload as { message?: string })?.message ?? "Upload failed.";
+    throw new ApiError(response.status, "upload", message);
+  }
+
+  return payload as { imageUrl: string };
+}
+
 export function adminLogin(email: string, password: string): Promise<AdminLoginResponse> {
   return request<AdminLoginResponse>("/api/admin/login", {
     method: "POST",

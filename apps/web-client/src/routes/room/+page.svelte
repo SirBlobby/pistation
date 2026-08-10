@@ -167,7 +167,11 @@
 
         <button
           onclick={toggleWhiteboard}
-          class="flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors"
+          disabled={current.mode === "whiteboard" && !current.canStopWhiteboard}
+          title={current.mode === "whiteboard" && !current.canStopWhiteboard
+            ? `${current.whiteboardOwnerName ?? "Someone else"} opened this whiteboard and can close it`
+            : undefined}
+          class="flex items-center gap-2 px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-60"
           class:bg-accent={current.mode === "whiteboard"}
           class:text-white={current.mode === "whiteboard"}
           class:bg-surface-2={current.mode !== "whiteboard"}
@@ -214,7 +218,10 @@
           {#if current.mode === "whiteboard"}
             <WhiteboardCanvas
               elements={current.whiteboardElements}
+              files={current.resolvedWhiteboardFiles}
               onLocalChange={(changed) => current.pushWhiteboardElements(changed)}
+              onLocalFile={(file) => void current.pushWhiteboardImage(file)}
+              onLocalClear={() => current.clearWhiteboard()}
             />
           {:else if current.localScreenTrack}
             <TrackVideo track={current.localScreenTrack} />

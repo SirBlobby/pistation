@@ -7,9 +7,15 @@ import type {
   StrokeStyle,
   TopicPayloadMap,
   WhiteboardElement,
-  WhiteboardEvent
+  WhiteboardEvent,
+  WhiteboardFile
 } from "@pistation/shared-types";
-import { DEFAULT_STROKE_STYLE, isTopic, mergeWhiteboardElements } from "@pistation/shared-types";
+import {
+  DEFAULT_STROKE_STYLE,
+  isTopic,
+  mergeWhiteboardElements,
+  mergeWhiteboardFiles
+} from "@pistation/shared-types";
 import type { AnnotationState, ConnectionStatus } from "@pistation/client-core";
 import {
   applyAnnotationEvent,
@@ -30,7 +36,7 @@ import {
   Track
 } from "livekit-client";
 
-import { refreshSession } from "./api";
+import { apiBaseUrl, refreshSession, uploadWhiteboardImage } from "./api";
 import type { StoredSession } from "./session";
 
 export type AnnotationTool = "pen" | "highlighter" | "arrow" | "rectangle" | "ellipse" | "laser";
@@ -54,6 +60,8 @@ export class RoomController {
   mode = $state<RoomMode>("idle");
   annotations = $state<AnnotationState>(createAnnotationState());
   whiteboardElements = $state<WhiteboardElement[]>([]);
+  whiteboardFiles = $state<WhiteboardFile[]>([]);
+  whiteboardOwnerId = $state<string | null>(null);
   screenTrack = $state<RemoteTrack | null>(null);
   localScreenTrack = $state<LocalVideoTrack | null>(null);
   localCameraTrack = $state<LocalVideoTrack | null>(null);
@@ -229,6 +237,17 @@ export class RoomController {
 
     this.participants = [self, ...others];
     this.sharingParticipantName = this.broadcaster?.displayName ?? null;
+
+    // Whoever opened the whiteboard has gone, so it would otherwise be stuck open for
+    // everyone still in the room.
+    if (
+      this.whiteboardOwnerId !== null &&
+      !this.participants.some(
+        (participant) => participant.participantId === this.whiteboardOwnerId
+      )
+    ) {
+      this.whiteboardOwnerId = null;
+    }
   }
 
   /// The room has a single broadcast slot. Whoever holds it, with either a screen or a
@@ -343,8 +362,27 @@ export class RoomController {
 
   setMode(mode: RoomMode): void {
     if (!this.canPresent) return;
+    if (this.mode === "whiteboard" && mode !== "whiteboard" && !this.canStopWhiteboard) return;
+
+    const ownerId = mode === "whiteboard" ? this.session.participantId : null;
+    this.whiteboardOwnerId = ownerId;
     this.mode = mode;
-    this.send("control", { type: "mode.set", mode });
+    this.send("control", { type: "mode.set", mode, ownerId });
+  }
+
+  /// A whiteboard belongs to whoever opened it, so nobody else can close it out from under
+  /// them. If that person has left the room the board is unowned and anyone may close it.
+  get canStopWhiteboard(): boolean {
+    if (this.whiteboardOwnerId === null) return true;
+    return this.whiteboardOwnerId === this.session.participantId;
+  }
+
+  get whiteboardOwnerName(): string | null {
+    if (this.whiteboardOwnerId === null) return null;
+    const owner = this.participants.find(
+      (participant) => participant.participantId === this.whiteboardOwnerId
+    );
+    return owner?.displayName ?? null;
   }
 
   beginStroke(point: NormalizedPoint): void {
@@ -429,6 +467,39 @@ export class RoomController {
     this.send("whiteboard", { type: "whiteboard.patch", elements });
   }
 
+  /// Image bytes are far too large for a data channel packet, so the binary goes to the
+  /// server over HTTP and only the URL it returns travels to the other participants.
+  async pushWhiteboardImage(file: {
+    id: string;
+    dataUrl: string;
+    mimeType: string;
+  }): Promise<void> {
+    try {
+      const blob = await (await fetch(file.dataUrl)).blob();
+      const { imageUrl } = await uploadWhiteboardImage(this.session.sessionId, blob);
+
+      const shared: WhiteboardFile = { id: file.id, url: imageUrl, mimeType: file.mimeType };
+      this.whiteboardFiles = mergeWhiteboardFiles(this.whiteboardFiles, [shared]);
+      this.send("whiteboard", { type: "whiteboard.patch", elements: [], files: [shared] });
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error);
+      this.errorMessage = `That image could not be shared: ${detail}`;
+    }
+  }
+
+  clearWhiteboard(): void {
+    this.whiteboardElements = [];
+    this.whiteboardFiles = [];
+    this.send("whiteboard", { type: "whiteboard.clear" });
+  }
+
+  get resolvedWhiteboardFiles(): WhiteboardFile[] {
+    return this.whiteboardFiles.map((file) => ({
+      ...file,
+      url: file.url.startsWith("http") ? file.url : `${apiBaseUrl}${file.url}`
+    }));
+  }
+
   private eraseAt(point: NormalizedPoint): void {
     const strokeIds = eraseAtPoint(this.annotations, point, 0.02);
     if (strokeIds.length === 0) return;
@@ -485,7 +556,7 @@ export class RoomController {
     }
 
     if (isTopic(envelope, "control")) {
-      this.handleControlEvent(envelope.payload);
+      this.handleControlEvent(envelope.payload, envelope.senderId);
       return;
     }
 
@@ -494,14 +565,18 @@ export class RoomController {
     }
   }
 
-  private handleControlEvent(event: ControlEvent): void {
+  private handleControlEvent(event: ControlEvent, senderId: string): void {
     if (event.type === "mode.set") {
       this.mode = event.mode;
+      this.whiteboardOwnerId =
+        event.mode === "whiteboard" ? (event.ownerId ?? senderId) : null;
       return;
     }
 
     if (event.type === "room.state") {
       this.mode = event.state.mode;
+      this.whiteboardOwnerId =
+        event.state.mode === "whiteboard" ? (event.state.whiteboardOwnerId ?? null) : null;
       return;
     }
 
@@ -512,6 +587,7 @@ export class RoomController {
           roomName: this.session.roomName,
           mode: this.mode,
           presenterId: this.session.participantId,
+          whiteboardOwnerId: this.whiteboardOwnerId,
           annotationsLocked: false,
           updatedAt: Date.now()
         }
@@ -522,16 +598,19 @@ export class RoomController {
   private handleWhiteboardEvent(event: WhiteboardEvent): void {
     if (event.type === "whiteboard.patch") {
       this.whiteboardElements = mergeWhiteboardElements(this.whiteboardElements, event.elements);
+      this.whiteboardFiles = mergeWhiteboardFiles(this.whiteboardFiles, event.files ?? []);
       return;
     }
 
     if (event.type === "whiteboard.snapshot") {
       this.whiteboardElements = event.elements;
+      this.whiteboardFiles = mergeWhiteboardFiles(this.whiteboardFiles, event.files ?? []);
       return;
     }
 
     if (event.type === "whiteboard.clear") {
       this.whiteboardElements = [];
+      this.whiteboardFiles = [];
       return;
     }
 
@@ -539,6 +618,7 @@ export class RoomController {
       this.send("whiteboard", {
         type: "whiteboard.snapshot",
         elements: this.whiteboardElements,
+        files: this.whiteboardFiles,
         backgroundColor: "#0b0d10"
       });
     }

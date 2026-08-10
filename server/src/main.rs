@@ -69,12 +69,23 @@ async fn main() {
         .allow_headers(Any)
         .allow_origin(Any);
 
+    // Uploaded images are public and are read with fetch by kiosks and browsers alike, which
+    // is blocked without these headers even though the same file loads fine in an img tag.
+    let media_cors = CorsLayer::new()
+        .allow_methods([Method::GET, Method::HEAD])
+        .allow_origin(Any);
+
     let app = Router::new()
         .route("/", axum::routing::get(routes::service_index))
         .route("/install.sh", axum::routing::get(routes::install_script))
         .nest("/api/kiosk", routes::kiosk_router().layer(kiosk_cors))
         .nest("/api", routes::api_router().layer(cors))
-        .nest_service("/media", ServeDir::new(state.config.media_dir.clone()))
+        .nest_service(
+            "/media",
+            Router::new()
+                .fallback_service(ServeDir::new(state.config.media_dir.clone()))
+                .layer(media_cors),
+        )
         .nest_service(
             "/downloads",
             ServeDir::new(state.config.package_dir.clone()),
