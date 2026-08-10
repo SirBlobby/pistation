@@ -72,12 +72,27 @@ docker compose -f infra/docker-compose.yml up -d
 | API | 8080 |
 | LiveKit | 7880 |
 
+If the host runs a firewall, open the LiveKit ports:
+
+```
+sudo ./infra/firewall.sh
+```
+
+It allows 7880 and 7881 TCP, 3478 UDP and 50000-50100 UDP from your LAN, handling ufw and
+firewalld. Pass `--dry-run` to see the commands first, `--subnet` to name a different network or
+`--open-to-all` to drop the source restriction. The website and API need no rules, since Docker
+publishes those ports with its own firewall rules. LiveKit runs on the host network and does not
+get that treatment, so a firewalled host will load the site and then fail to connect to a room.
+
 Sign in at `/admin` with the bootstrap admin details from your `.env`.
 
-If you are serving anything other than localhost, set `PUBLIC_API_URL` and
-`PUBLIC_LIVEKIT_URL` in `infra/.env` to addresses your devices can actually reach, and change
-`turn.domain` in `infra/livekit.yaml` to the same host. LiveKit reads that file literally, so it
-does not pick up environment variables.
+If you are serving anything other than localhost, set `PUBLIC_API_URL`, `PUBLIC_LIVEKIT_URL` and
+`PUBLIC_WEB_URL` in `infra/.env` to addresses your devices can actually reach, add
+`PUBLIC_WEB_URL` to `CORS_ORIGINS`, and change `turn.domain` in `infra/livekit.yaml` to the same
+host. LiveKit reads that file literally, so it does not pick up environment variables.
+
+Leaving `CORS_ORIGINS` on its localhost default while browsing by LAN address is the usual cause
+of requests failing with a missing `Access-Control-Allow-Origin` header.
 
 The LiveKit container uses host networking, because WebRTC needs to advertise an address your
 devices can reach and a container on a bridge network has none. That is Linux only; on macOS or
@@ -128,7 +143,8 @@ Set in `infra/.env`:
 | `PIN_ROTATION_SECONDS` | How often join codes change, 30 to 60 |
 | `PIN_GRACE_SECONDS` | How long an old code keeps working after it changes |
 | `PUBLIC_API_URL` / `PUBLIC_LIVEKIT_URL` | Addresses browsers and kiosks use to reach you |
-| `CORS_ORIGINS` | Browser origins allowed to call the API. Kiosks are exempt, since a desktop app has no fixed web origin |
+| `PUBLIC_WEB_URL` | The address the website is served on. Must match what you type in the browser, scheme included, or server rendered pages disagree with the browser |
+| `CORS_ORIGINS` | Browser origins allowed to call the API, comma separated. Must include `PUBLIC_WEB_URL`. Kiosks are exempt, since a desktop app has no fixed web origin |
 
 Video encoding on the kiosk is tunable per device, without rebuilding:
 
