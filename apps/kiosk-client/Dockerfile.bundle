@@ -28,7 +28,9 @@ COPY packages packages
 COPY apps/kiosk-client apps/kiosk-client
 
 RUN bun install
-RUN bun run build:kiosk
+
+WORKDIR /work/apps/kiosk-client
+RUN bun run tauri build --bundles deb
 
 FROM scratch AS bundle
-COPY --from=build /work/apps/kiosk-client/src-tauri/target/release/bundle /
+COPY --from=build /work/apps/kiosk-client/src-tauri/target/release/bundle/deb /

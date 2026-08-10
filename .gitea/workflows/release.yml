@@ -1,8 +1,9 @@
 name: Release
 
-# Container images are published separately by publish-images.yml. This builds the kiosk
-# package for the Pi, which needs an arm64 toolchain, so it goes through buildx and QEMU
-# rather than running on the host directly.
+# Container images are published separately by publish-images.yml. This builds the kiosk .deb
+# for the Pi, which needs an arm64 toolchain, so it goes through buildx and QEMU rather than
+# running on the host directly. Only the .deb is built here: AppImage bundling shells out to
+# linuxdeploy, which needs FUSE and cannot run inside an emulated build.
 on:
   push:
     tags: ["v*"]
@@ -33,7 +34,6 @@ jobs:
         run: |
           mkdir -p dist
           find bundle -name '*.deb' -exec cp {} dist/ \;
-          find bundle -name '*.AppImage' -exec cp {} dist/ \;
           ls -lh dist
 
       - uses: actions/upload-artifact@v4
