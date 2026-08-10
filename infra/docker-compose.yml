@@ -55,5 +55,23 @@ services:
     ports:
       - "3000:3000"
 
+  proxy:
+    image: nginx:alpine
+    restart: unless-stopped
+    profiles:
+      - tls
+    depends_on:
+      - server
+      - web
+    volumes:
+      - ./proxy.conf:/etc/nginx/conf.d/pistation.conf:ro
+      - ./certs:/etc/nginx/certs:ro
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "${TLS_WEB_PORT:-3443}:3443"
+      - "${TLS_API_PORT:-8443}:8443"
+      - "${TLS_LIVEKIT_PORT:-7443}:7443"
+
 volumes:
   server-data:

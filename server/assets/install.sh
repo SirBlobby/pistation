@@ -6,6 +6,7 @@ PACKAGE_URL=""
 ENROLLMENT_KEY=""
 JOIN_URL=""
 KIOSK_USER="pistation"
+CA_CERT=""
 SKIP_REBOOT="no"
 FORCED_PROFILE=""
 FORCED_SWAP=""
@@ -26,6 +27,7 @@ Options
   --join-url <host>      Address shown on screen for people joining, defaults to the server host
   --package-url <url>    Override where the kiosk .deb is downloaded from
   --user <name>          System user to run the kiosk as, defaults to pistation
+  --ca-cert <path|url>   Trust this certificate authority, needed for a self signed server
   --profile <name>       Force a video profile: zero2, pi4, pi5 or generic
   --swap <mb>            Swap size in MB, defaults to the profile's value
   --skip-reboot          Install and enable, but do not reboot at the end
@@ -45,6 +47,8 @@ while [[ $# -gt 0 ]]; do
     --package-url=*) PACKAGE_URL="${1#*=}"; shift ;;
     --user) KIOSK_USER="${2:-}"; shift 2 ;;
     --user=*) KIOSK_USER="${1#*=}"; shift ;;
+    --ca-cert) CA_CERT="${2:-}"; shift 2 ;;
+    --ca-cert=*) CA_CERT="${1#*=}"; shift ;;
     --profile) FORCED_PROFILE="${2:-}"; shift 2 ;;
     --profile=*) FORCED_PROFILE="${1#*=}"; shift ;;
     --swap) FORCED_SWAP="${2:-}"; shift 2 ;;
@@ -149,6 +153,24 @@ apt-get install -y --no-install-recommends \
   gstreamer1.0-nice \
   libnice10 \
   libgles2
+
+# A kiosk has nobody to click through a certificate warning, so a self signed server has to be
+# trusted here or every request it makes fails, starting with the package download below.
+if [[ -n "$CA_CERT" ]]; then
+  log "trusting the certificate authority at $CA_CERT"
+  CA_TARGET="/usr/local/share/ca-certificates/pistation-ca.crt"
+
+  if [[ "$CA_CERT" == http://* || "$CA_CERT" == https://* ]]; then
+    curl -fsSL "$CA_CERT" -o "$CA_TARGET" ||
+      fail "could not download the certificate authority from $CA_CERT"
+  else
+    [[ -f "$CA_CERT" ]] || fail "no certificate authority at $CA_CERT"
+    cp "$CA_CERT" "$CA_TARGET"
+  fi
+
+  chmod 644 "$CA_TARGET"
+  update-ca-certificates >/dev/null || fail "the certificate authority was rejected"
+fi
 
 log "downloading the kiosk package from $PACKAGE_URL"
 PACKAGE_FILE="$(mktemp /tmp/pistation-kiosk.XXXXXX.deb)"

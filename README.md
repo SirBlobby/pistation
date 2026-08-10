@@ -72,6 +72,9 @@ docker compose -f infra/docker-compose.yml up -d
 | API | 8080 |
 | LiveKit | 7880 |
 
+Anything other than localhost also wants HTTPS, or browsers will refuse the camera and screen
+sharing. See below.
+
 If the host runs a firewall, open the LiveKit ports:
 
 ```
@@ -93,6 +96,61 @@ host. LiveKit reads that file literally, so it does not pick up environment vari
 
 Leaving `CORS_ORIGINS` on its localhost default while browsing by LAN address is the usual cause
 of requests failing with a missing `Access-Control-Allow-Origin` header.
+
+### HTTPS
+
+Browsers only hand out the camera or the screen on a secure origin. `localhost` counts as one, a
+LAN address does not, so on `http://192.168.1.45:3000` sharing is refused before PiStation ever
+sees the request. That needs a certificate:
+
+```
+./infra/certs.sh
+docker compose -f infra/docker-compose.yml --profile tls up -d
+```
+
+The script reads the addresses out of `infra/.env`, creates a certificate authority of your own
+and issues one certificate covering all of them, plus `localhost` and the machine's LAN address.
+Pass `--host` for a name it cannot work out, like a router alias. An nginx container then
+terminates TLS in front of all three services:
+
+| Service | Plain | Encrypted |
+| --- | --- | --- |
+| Website | 3000 | 3443 |
+| API | 8080 | 8443 |
+| LiveKit | 7880 | 7443 |
+
+Point `infra/.env` at the encrypted ports and recreate the stack. The script prints the exact
+lines to paste:
+
+```
+PUBLIC_WEB_URL=https://192.168.1.45:3443
+PUBLIC_API_URL=https://192.168.1.45:8443
+PUBLIC_LIVEKIT_URL=wss://192.168.1.45:7443
+CORS_ORIGINS=https://192.168.1.45:3443
+```
+
+All three move together. A page served over HTTPS cannot call a plain API or open a plain
+websocket, and the browser blocks the attempt as mixed content.
+
+Nobody will sign a certificate for an address they do not own, so this one is signed by an
+authority that exists only on your machine and no device trusts it yet. Install
+`infra/certs/ca.crt` once per device and the warnings stop:
+
+| Device | Where |
+| --- | --- |
+| Android | Settings, Security, Encryption and credentials, Install a certificate |
+| iOS | Mail it to yourself, open it, install the profile, then trust it under General, About, Certificate Trust Settings |
+| macOS | Open it in Keychain Access, add to System, set it to Always Trust |
+| Windows | Install into Trusted Root Certification Authorities for the local machine |
+| Linux and kiosks | Copy to `/usr/local/share/ca-certificates/` and run `update-ca-certificates` |
+
+Clicking through the browser warning instead mostly works, but it is three separate warnings,
+since each port is its own origin, and it has to be redone on every device. Kiosks get no warning
+to click through at all, so they need the authority installed.
+
+Certificates last 825 days, the longest Safari accepts. Re-running the script issues a fresh one
+and keeps the same authority, so devices stay trusted. `--new-ca` replaces the authority and
+means installing it everywhere again.
 
 The LiveKit container uses host networking, because WebRTC needs to advertise an address your
 devices can reach and a container on a bridge network has none. That is Linux only; on macOS or
@@ -128,8 +186,16 @@ Raspberry Pi OS ships with 100 MB of swap, which a 512 MB Zero 2 W exhausts as s
 browser engine and the media stack are both running. Without more, the kernel starts killing
 processes and the kiosk appears to restart at random.
 
-Useful flags: `--server`, `--join-url`, `--package-url`, `--user`, `--profile`, `--swap`,
-`--skip-reboot`.
+On a self signed server, copy `infra/certs/ca.crt` to the Pi first and point the installer at it,
+or nothing it downloads will verify:
+
+```
+scp infra/certs/ca.crt pi@your-kiosk:
+curl -fsSL http://your-server:8080/install.sh | sudo bash -s -- --key <token> --ca-cert ./ca.crt
+```
+
+Useful flags: `--server`, `--join-url`, `--package-url`, `--user`, `--ca-cert`, `--profile`,
+`--swap`, `--skip-reboot`.
 
 ## Configuration
 
@@ -145,6 +211,7 @@ Set in `infra/.env`:
 | `PUBLIC_API_URL` / `PUBLIC_LIVEKIT_URL` | Addresses browsers and kiosks use to reach you |
 | `PUBLIC_WEB_URL` | The address the website is served on. Must match what you type in the browser, scheme included, or server rendered pages disagree with the browser |
 | `CORS_ORIGINS` | Browser origins allowed to call the API, comma separated. Must include `PUBLIC_WEB_URL`. Kiosks are exempt, since a desktop app has no fixed web origin |
+| `TLS_WEB_PORT` / `TLS_API_PORT` / `TLS_LIVEKIT_PORT` | Ports the `tls` profile serves HTTPS on, defaulting to 3443, 8443 and 7443 |
 
 Video encoding on the kiosk is tunable per device, without rebuilding:
 
