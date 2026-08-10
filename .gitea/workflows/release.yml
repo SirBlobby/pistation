@@ -1,7 +1,8 @@
 name: Release
 
 # Container images are published separately by publish-images.yml. This builds the kiosk
-# package for the Pi, which needs an arm64 toolchain rather than a Docker build.
+# package for the Pi, which needs an arm64 toolchain, so it goes through buildx and QEMU
+# rather than running on the host directly.
 on:
   push:
     tags: ["v*"]
@@ -17,35 +18,22 @@ jobs:
         with:
           platforms: arm64
 
+      - uses: docker/setup-buildx-action@v3
+
       - name: Build the kiosk bundle for arm64
-        run: |
-          docker run --rm --platform linux/arm64 \
-            -v "$PWD:/work" -w /work \
-            arm64v8/debian:bookworm \
-            bash -eux -c '
-              export DEBIAN_FRONTEND=noninteractive
-              apt-get update
-              apt-get install -y --no-install-recommends \
-                curl ca-certificates unzip build-essential file wget \
-                libwebkit2gtk-4.1-dev libgtk-3-dev librsvg2-dev \
-                libayatana-appindicator3-dev libssl-dev patchelf pkg-config
-
-              curl -fsSL https://sh.rustup.rs | sh -s -- -y --profile minimal
-              . "$HOME/.cargo/env"
-
-              curl -fsSL https://bun.sh/install | bash
-              export PATH="$HOME/.bun/bin:$PATH"
-
-              bun install
-              export PATH="/work/node_modules/.bin:$PATH"
-              bun run build:kiosk
-            '
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./apps/kiosk-client/Dockerfile.bundle
+          platforms: linux/arm64
+          target: bundle
+          outputs: type=local,dest=bundle
 
       - name: Collect artifacts
         run: |
           mkdir -p dist
-          find apps/kiosk-client/src-tauri/target/release/bundle -name '*.deb' -exec cp {} dist/ \;
-          find apps/kiosk-client/src-tauri/target/release/bundle -name '*.AppImage' -exec cp {} dist/ \;
+          find bundle -name '*.deb' -exec cp {} dist/ \;
+          find bundle -name '*.AppImage' -exec cp {} dist/ \;
           ls -lh dist
 
       - uses: actions/upload-artifact@v4

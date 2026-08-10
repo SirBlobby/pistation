@@ -1,0 +1,15 @@
+.git
+.gitea
+node_modules
+**/node_modules
+target
+**/target
+build
+**/build
+.svelte-kit
+**/.svelte-kit
+data
+infra/certs
+*.db
+*.db-shm
+*.db-wal
