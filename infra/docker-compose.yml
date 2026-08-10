@@ -49,6 +49,7 @@ services:
     environment:
       PORT: 3000
       HOST: 0.0.0.0
+      ORIGIN: ${PUBLIC_WEB_URL}
       PUBLIC_API_URL: ${PUBLIC_API_URL}
       PUBLIC_LIVEKIT_URL: ${PUBLIC_LIVEKIT_URL}
     ports:
